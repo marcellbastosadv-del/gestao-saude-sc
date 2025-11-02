@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestão - Marcell Bastos | Saúde Suplementar</title>
+    <meta name="description" content="Sistema de gestão de ações de medicamento alto custo - Santa Catarina">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #F5F5F5;
+        }
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #E0E0E0;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #064C4A;
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #F71735;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        input[type="checkbox"] {
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            accent-color: #064C4A;
+        }
+        .btn-primary {
+            background-color: #064C4A;
+            color: white;
+            transition: all 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #053d38;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(6, 76, 74, 0.3);
+        }
+        .btn-secondary {
+            background-color: #F71735;
+            color: white;
+            transition: all 0.3s;
+        }
+        .btn-secondary:hover {
+            background-color: #d01229;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(247, 23, 53, 0.3);
+        }
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+            transition: all 0.3s;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+            transform: translateY(-2px);
+        }
+        .progress-gradient {
+            background: linear-gradient(to right, #064C4A, #F71735);
+        }
+        .card {
+            transition: all 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+        }
+        .badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 9999px;
+            font-weight: 600;
+        }
+        .timestamp {
+            font-size: 11px;
+            color: #6B7280;
+            font-style: italic;
+        }
+        .modal-overlay {
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        // SISTEMA DE GESTÃO MARCELL BASTOS - VERSÃO 2.0
+        const App = {
+            state: {
+                view: 'lista',
+                pacientes: [],
+                pacienteSelecionado: null,
+                pacienteEditando: null,
+                loading: true,
+                searchTerm: '',
+                showShareModal: false,
+                showEditModal: false,
+                showDeleteModal: false,
+                showObservacaoModal: false,
+                linkCopiado: false,
+                observacaoAtual: '',
+                etapaObservacao: null,
+                novoPaciente: {
+                    nome: '', cpf: '', telefone: '', email: '',
+                    planoSaude: '', medicamento: '', diagnostico: '', cid10: '', dataProtocolo: ''
+                }
+            },
+
+            fases: [
+                {
+                    id: 1, nome: 'Captação e Primeiro Contato', peso: 10,
+                    etapas: ['Primeiro contato WhatsApp', 'Triagem inicial', 'Solicitação de documentos']
+                },
+                {
+                    id: 2, nome: 'Consulta e Contratação', peso: 15,
+                    etapas: ['Agendamento', 'Consulta inicial', 'Assinatura contrato']
+                },
+                {
+                    id: 3, nome: 'Petição e Protocolo', peso: 15,
+                    etapas: ['Elaboração petição', 'Reunir documentos', 'Protocolo EPROC']
+                },
+                {
+                    id: 4, nome: 'Acompanhamento', peso: 20,
+                    etapas: ['Distribuição', 'Análise pelo juiz']
+                },
+                {
+                    id: 5, nome: 'Decisão Liminar', peso: 20,
+                    etapas: ['Liminar deferida', 'Notificação plano', 'Cumprimento']
+                },
+                {
+                    id: 6, nome: 'Contestação', peso: 10,
+                    etapas: ['Prazo contestação', 'Especificação provas', 'Audiência']
+                },
+                {
+                    id: 7, nome: 'Sentença', peso: 10,
+                    etapas: ['Sentença primeiro grau']
+                }
+            ],
+
+            init() {
+                this.carregarPacientes();
+                this.render();
+            },
+
+            async carregarPacientes() {
+                try {
+                    const dados = localStorage.getItem('pacientes_marcell_bastos');
+                    if (dados) {
+                        this.state.pacientes = JSON.parse(dados);
+                    }
+                } catch (error) {
+                    console.log('Inicializando sistema...', error);
+                }
+                this.state.loading = false;
+                this.render();
+            },
+
+            salvarPacientes() {
+                try {
+                    localStorage.setItem('pacientes_marcell_bastos', JSON.stringify(this.state.pacientes));
+                    return true;
+                } catch (error) {
+                    alert('Erro ao salvar. Tente novamente.');
+                    return false;
+                }
+            },
+
+            adicionarPaciente() {
+                const { novoPaciente } = this.state;
+                if (!novoPaciente.nome || !novoPaciente.cpf) {
+                    alert('Preencha pelo menos nome e CPF');
+                    return;
+                }
+
+                const paciente = {
+                    ...novoPaciente,
+                    id: Date.now().toString(),
+                    progresso: {},
+                    observacoes: {},
+                    timestamps: {},
+                    dataCriacao: new Date().toISOString(),
+                    dataUltimaAtualizacao: new Date().toISOString(),
+                    linkPublico: Date.now().toString().slice(-8)
+                };
+
+                this.state.pacientes.push(paciente);
+                this.salvarPacientes();
+                this.state.novoPaciente = {
+                    nome: '', cpf: '', telefone: '', email: '',
+                    planoSaude: '', medicamento: '', diagnostico: '', cid10: '', dataProtocolo: ''
+                };
+                this.state.view = 'lista';
+                this.render();
+            },
+
+            editarPaciente() {
+                const { pacienteEditando } = this.state;
+                if (!pacienteEditando.nome || !pacienteEditando.cpf) {
+                    alert('Preencha pelo menos nome e CPF');
+                    return;
+                }
+
+                const idx = this.state.pacientes.findIndex(p => p.id === pacienteEditando.id);
+                if (idx !== -1) {
+                    this.state.pacientes[idx] = {
+                        ...pacienteEditando,
+                        dataUltimaAtualizacao: new Date().toISOString()
+                    };
+                    this.salvarPacientes();
+                    this.state.showEditModal = false;
+                    this.state.pacienteEditando = null;
+                    
+                    if (this.state.pacienteSelecionado && this.state.pacienteSelecionado.id === pacienteEditando.id) {
+                        this.state.pacienteSelecionado = this.state.pacientes[idx];
+                    }
+                    
+                    this.render();
+                }
+            },
+
+            excluirPaciente(id) {
+                if (!confirm('Tem certeza que deseja excluir este paciente? Esta ação não pode ser desfeita.')) {
+                    return;
+                }
+
+                this.state.pacientes = this.state.pacientes.filter(p => p.id !== id);
+                this.salvarPacientes();
+                this.state.showDeleteModal = false;
+                
+                if (this.state.pacienteSelecionado && this.state.pacienteSelecionado.id === id) {
+                    this.state.pacienteSelecionado = null;
+                    this.state.view = 'lista';
+                }
+                
+                this.render();
+            },
+
+            calcularProgresso(progresso) {
+                if (!progresso) return 0;
+                let total = 0;
+                let completado = 0;
+
+                this.fases.forEach(fase => {
+                    fase.etapas.forEach((_, idx) => {
+                        total += fase.peso / fase.etapas.length;
+                        if (progresso[`${fase.id}-${idx}`]) {
+                            completado += fase.peso / fase.etapas.length;
+                        }
+                    });
+                });
+
+                return Math.round(completado);
+            },
+
+            calcularProgressoFase(faseId, progresso) {
+                if (!progresso) return 0;
+                const fase = this.fases.find(f => f.id === faseId);
+                if (!fase) return 0;
+
+                let completadas = 0;
+                fase.etapas.forEach((_, idx) => {
+                    if (progresso[`${faseId}-${idx}`]) completadas++;
+                });
+
+                return Math.round((completadas / fase.etapas.length) * 100);
+            },
+
+            toggleEtapa(faseId, etapaIdx) {
+                const key = `${faseId}-${etapaIdx}`;
+                if (!this.state.pacienteSelecionado.progresso) {
+                    this.state.pacienteSelecionado.progresso = {};
+                }
+                if (!this.state.pacienteSelecionado.timestamps) {
+                    this.state.pacienteSelecionado.timestamps = {};
+                }
+
+                const estaChecado = this.state.pacienteSelecionado.progresso[key];
+                this.state.pacienteSelecionado.progresso[key] = !estaChecado;
+
+                // Adicionar/remover timestamp
+                if (!estaChecado) {
+                    this.state.pacienteSelecionado.timestamps[key] = new Date().toISOString();
+                } else {
+                    delete this.state.pacienteSelecionado.timestamps[key];
+                }
+
+                this.state.pacienteSelecionado.dataUltimaAtualizacao = new Date().toISOString();
+
+                const idx = this.state.pacientes.findIndex(p => p.id === this.state.pacienteSelecionado.id);
+                if (idx !== -1) {
+                    this.state.pacientes[idx] = this.state.pacienteSelecionado;
+                    this.salvarPacientes();
+                }
+                this.render();
+            },
+
+            adicionarObservacao() {
+                const { observacaoAtual, etapaObservacao, pacienteSelecionado } = this.state;
+                if (!observacaoAtual.trim()) {
+                    alert('Digite uma observação');
+                    return;
+                }
+
+                if (!pacienteSelecionado.observacoes) {
+                    pacienteSelecionado.observacoes = {};
+                }
+
+                const key = `${etapaObservacao.faseId}-${etapaObservacao.etapaIdx}`;
+                if (!pacienteSelecionado.observacoes[key]) {
+                    pacienteSelecionado.observacoes[key] = [];
+                }
+
+                pacienteSelecionado.observacoes[key].push({
+                    texto: observacaoAtual,
+                    data: new Date().toISOString()
+                });
+
+                const idx = this.state.pacientes.findIndex(p => p.id === pacienteSelecionado.id);
+                if (idx !== -1) {
+                    this.state.pacientes[idx] = pacienteSelecionado;
+                    this.salvarPacientes();
+                }
+
+                this.state.showObservacaoModal = false;
+                this.state.observacaoAtual = '';
+                this.state.etapaObservacao = null;
+                this.render();
+            },
+
+            formatarDataHora(isoString) {
+                if (!isoString) return '';
+                const data = new Date(isoString);
+                const dia = String(data.getDate()).padStart(2, '0');
+                const mes = String(data.getMonth() + 1).padStart(2, '0');
+                const ano = data.getFullYear();
+                const hora = String(data.getHours()).padStart(2, '0');
+                const min = String(data.getMinutes()).padStart(2, '0');
+                return `${dia}/${mes}/${ano} às ${hora}:${min}`;
+            },
+
+            gerarLinkCompartilhamento(paciente) {
+                return `${window.location.origin}${window.location.pathname}?view=publico&id=${paciente.linkPublico}`;
+            },
+
+            copiarLink(paciente) {
+                const link = this.gerarLinkCompartilhamento(paciente);
+                navigator.clipboard.writeText(link);
+                this.state.linkCopiado = true;
+                this.render();
+                setTimeout(() => {
+                    this.state.linkCopiado = false;
+                    this.render();
+                }, 2000);
+            },
+
+            compartilharWhatsApp(paciente) {
+                const link = this.gerarLinkCompartilhamento(paciente);
+                const mensagem = `Olá ${paciente.nome.split(' ')[0]}! 👋\n\nSeu processo está em andamento. Acompanhe em tempo real pelo link:\n\n${link}\n\nQualquer dúvida, estou à disposição! ⚖️`;
+                const whatsappUrl = `https://wa.me/55${paciente.telefone.replace(/\D/g, '')}?text=${encodeURIComponent(mensagem)}`;
+                window.open(whatsappUrl, '_blank');
+            },
+
+            exportarDados() {
+                const dataStr = JSON.stringify(this.state.pacientes, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `backup-gestao-${new Date().toISOString().split('T')[0]}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+            },
+
+            importarDados(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const dados = JSON.parse(e.target.result);
+                        if (confirm(`Deseja importar ${dados.length} pacientes? Isso irá SUBSTITUIR todos os dados atuais.`)) {
+                            this.state.pacientes = dados;
+                            this.salvarPacientes();
+                            this.render();
+                            alert('Dados importados com sucesso!');
+                        }
+                    } catch (error) {
+                        alert('Erro ao importar arquivo. Verifique se é um backup válido.');
+                    }
+                };
+                reader.readAsText(file);
+            },
+
+            getEstatisticas() {
+                const total = this.state.pacientes.length;
+                let concluidos = 0;
+                let emAndamento = 0;
+                let somaProgresso = 0;
+
+                this.state.pacientes.forEach(p => {
+                    const prog = this.calcularProgresso(p.progresso);
+                    somaProgresso += prog;
+                    if (prog === 100) concluidos++;
+                    else if (prog > 0) emAndamento++;
+                });
+
+                const mediaProgresso = total > 0 ? Math.round(somaProgresso / total) : 0;
+
+                return { total, concluidos, emAndamento, mediaProgresso };
+            },
+
+            render() {
+                const { view, pacientes, pacienteSelecionado, pacienteEditando, loading, searchTerm, showShareModal, showEditModal, showDeleteModal, showObservacaoModal, linkCopiado, novoPaciente, observacaoAtual } = this.state;
+
+                const pacientesFiltrados = pacientes.filter(p =>
+                    p.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    p.cpf?.includes(searchTerm) ||
+                    p.medicamento?.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+
+                const stats = this.getEstatisticas();
+
+                let html = '';
+
+                // MODAL DE COMPARTILHAMENTO
+                if (showShareModal && pacienteSelecionado) {
+                    const link = this.gerarLinkCompartilhamento(pacienteSelecionado);
+                    html += `
+                        <div class="fixed inset-0 bg-black bg-opacity-50 modal-overlay flex items-center justify-center z-50 p-4 fade-in" onclick="App.state.showShareModal = false; App.render();">
+                            <div class="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 slide-in" onclick="event.stopPropagation();">
+                                <h3 class="text-xl font-bold text-gray-800 mb-4">📤 Compartilhar Progresso</h3>
+                                
+                                <div class="mb-4">
+                                    <p class="text-sm text-gray-600 mb-2">Link público para ${pacienteSelecionado.nome}:</p>
+                                    <div class="flex gap-2">
+                                        <input type="text" value="${link}" readonly class="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded text-sm" />
+                                        <button onclick="App.copiarLink(App.state.pacienteSelecionado)" class="btn-primary px-4 py-2 rounded font-semibold">
+                                            ${linkCopiado ? '✓ Copiado!' : '📋 Copiar'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <button onclick="App.compartilharWhatsApp(App.state.pacienteSelecionado)" class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2">
+                                        📱 Enviar via WhatsApp
+                                    </button>
+                                    <button onclick="window.open('${link}', '_blank')" class="w-full px-4 py-3 btn-primary rounded-lg font-semibold flex items-center justify-center gap-2">
+                                        👁️ Abrir Preview
+                                    </button>
+                                    <button onclick="App.state.showShareModal = false; App.render();" class="w-full px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold">
+                                        Fechar
+                                    </button>
+                                </div>
+
+                                <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <p class="text-xs text-yellow-800">
+                                        <strong>⚠️ Atenção:</strong> Este link é público e permite apenas visualização.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // MODAL DE EDIÇÃO
+                if (showEditModal && pacienteEditando) {
+                    html += `
+                        <div class="fixed inset-0 bg-black bg-opacity-50 modal-overlay flex items-center justify-center z-50 p-4 fade-in" onclick="App.state.showEditModal = false; App.render();">
+                            <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full p-6 max-h-screen overflow-y-auto slide-in" onclick="event.stopPropagation();">
+                                <h3 class="text-2xl font-bold mb-6" style="color: #064C4A;">✏️ Editar Paciente</h3>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                    ${Object.keys(pacienteEditando).filter(k => !['id', 'progresso', 'observacoes', 'timestamps', 'dataCriacao', 'dataUltimaAtualizacao', 'linkPublico'].includes(k)).map(campo => `
+                                        <div>
+                                            <label class="block text-sm font-semibold mb-2" style="color: #1E1E1E;">
+                                                ${campo === 'nome' ? 'Nome Completo' :
+                                                  campo === 'cpf' ? 'CPF' :
+                                                  campo === 'telefone' ? 'Telefone' :
+                                                  campo === 'email' ? 'E-mail' :
+                                                  campo === 'planoSaude' ? 'Plano de Saúde' :
+                                                  campo === 'medicamento' ? 'Medicamento' :
+                                                  campo === 'diagnostico' ? 'Diagnóstico' :
+                                                  campo === 'cid10' ? 'CID-10' :
+                                                  campo === 'dataProtocolo' ? 'Data de Protocolo' : campo}
+                                            </label>
+                                            <input type="${campo === 'email' ? 'email' : campo === 'dataProtocolo' ? 'date' : 'text'}" 
+                                                value="${pacienteEditando[campo] || ''}"
+                                                oninput="App.state.pacienteEditando.${campo} = this.value"
+                                                class="w-full px-4 py-2 border-2 rounded-lg focus:outline-none"
+                                                style="border-color: #E0E0E0;" />
+                                        </div>
+                                    `).join('')}
+                                </div>
+
+                                <div class="flex gap-4">
+                                    <button onclick="App.state.showEditModal = false; App.render();"
+                                        class="flex-1 px-6 py-3 border-2 rounded-lg hover:bg-gray-50 font-semibold"
+                                        style="border-color: #E0E0E0; color: #1E1E1E;">
+                                        Cancelar
+                                    </button>
+                                    <button onclick="App.editarPaciente();"
+                                        class="flex-1 px-6 py-3 btn-primary rounded-lg font-semibold shadow-md">
+                                        💾 Salvar Alterações
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // MODAL DE OBSERVAÇÃO
+                if (showObservacaoModal) {
+                    html += `
+                        <div class="fixed inset-0 bg-black bg-opacity-50 modal-overlay flex items-center justify-center z-50 p-4 fade-in" onclick="App.state.showObservacaoModal = false; App.render();">
+                            <div class="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 slide-in" onclick="event.stopPropagation();">
+                                <h3 class="text-xl font-bold text-gray-800 mb-4">📝 Adicionar Observação</h3>
+                                
+                                <textarea 
+                                    placeholder="Digite sua observação..."
+                                    oninput="App.state.observacaoAtual = this.value"
+                                    class="w-full px-4 py-3 border-2 rounded-lg focus:outline-none mb-4"
+                                    style="border-color: #E0E0E0; min-height: 120px;">${observacaoAtual}</textarea>
+
+                                <div class="flex gap-3">
+                                    <button onclick="App.state.showObservacaoModal = false; App.render();"
+                                        class="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold">
+                                        Cancelar
+                                    </button>
+                                    <button onclick="App.adicionarObservacao();"
+                                        class="flex-1 px-4 py-2 btn-primary rounded-lg font-semibold">
+                                        💾 Salvar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // VIEW: LISTA
+                if (view === 'lista') {
+                    html += `
+                        <div class="min-h-screen p-4" style="background-color: #F5F5F5;">
+                            <div class="max-w-7xl mx-auto">
+                                <!-- Header -->
+                                <div class="bg-white rounded-lg shadow-xl p-6 mb-6 fade-in">
+                                    <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+                                        <div class="flex items-center gap-4">
+                                            <svg width="60" height="60" viewBox="0 0 100 100">
+                                                <circle cx="50" cy="50" r="45" fill="none" stroke="#064C4A" stroke-width="3"/>
+                                                <path d="M30 60 Q40 45, 50 55 Q60 65, 70 50" fill="none" stroke="#064C4A" stroke-width="3"/>
+                                                <rect x="45" y="15" width="10" height="35" fill="#064C4A"/>
+                                                <rect x="40" y="20" width="20" height="5" fill="#064C4A"/>
+                                                <rect x="40" y="28" width="20" height="3" fill="#064C4A"/>
+                                            </svg>
+                                            <div>
+                                                <h1 class="text-3xl md:text-4xl font-bold" style="color: #064C4A;">Sistema de Gestão</h1>
+                                                <p class="text-sm md:text-base" style="color: #1E1E1E;">Marcell Bastos - Saúde Suplementar</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-2 flex-wrap">
+                                            <button onclick="document.getElementById('importFile').click();"
+                                                class="px-4 py-3 btn-primary rounded-lg font-semibold shadow-md flex items-center gap-2">
+                                                📥 Importar
+                                            </button>
+                                            <input type="file" id="importFile" accept=".json" onchange="App.importarDados(event)" style="display:none;" />
+                                            
+                                            <button onclick="App.exportarDados();"
+                                                class="px-4 py-3 btn-primary rounded-lg font-semibold shadow-md flex items-center gap-2">
+                                                💾 Exportar
+                                            </button>
+                                            
+                                            <button onclick="App.state.view = 'novo'; App.render();" 
+                                                class="px-6 py-3 btn-secondary rounded-lg font-semibold shadow-md flex items-center gap-2">
+                                                ➕ Novo Paciente
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Dashboard de Estatísticas -->
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border-2 border-blue-200">
+                                            <p class="text-sm text-blue-700 font-semibold mb-1">Total de Pacientes</p>
+                                            <p class="text-3xl font-bold text-blue-900">${stats.total}</p>
+                                        </div>
+                                        <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border-2 border-green-200">
+                                            <p class="text-sm text-green-700 font-semibold mb-1">Concluídos</p>
+                                            <p class="text-3xl font-bold text-green-900">${stats.concluidos}</p>
+                                        </div>
+                                        <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border-2 border-yellow-200">
+                                            <p class="text-sm text-yellow-700 font-semibold mb-1">Em Andamento</p>
+                                            <p class="text-3xl font-bold text-yellow-900">${stats.emAndamento}</p>
+                                        </div>
+                                        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border-2 border-purple-200">
+                                            <p class="text-sm text-purple-700 font-semibold mb-1">Progresso Médio</p>
+                                            <p class="text-3xl font-bold text-purple-900">${stats.mediaProgresso}%</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="relative">
+                                        <input type="text" placeholder="🔍 Buscar por nome, CPF ou medicamento..." 
+                                            value="${searchTerm}"
+                                            oninput="App.state.searchTerm = this.value; App.render();"
+                                            class="w-full px-4 py-3 border-2 rounded-lg focus:outline-none text-lg" 
+                                            style="border-color: #E0E0E0;" />
+                                    </div>
+                                </div>
+
+                                ${loading ? `
+                                    <div class="text-center py-12">
+                                        <div class="animate-spin rounded-full h-16 w-16 border-4 border-t-transparent mx-auto mb-4" style="border-color: #064C4A;"></div>
+                                        <p style="color: #1E1E1E;" class="text-lg">Carregando pacientes...</p>
+                                    </div>
+                                ` : pacientesFiltrados.length === 0 ? `
+                                    <div class="bg-white rounded-lg shadow-md p-12 text-center fade-in">
+                                        <div class="text-6xl mb-4">👤</div>
+                                        <h3 class="text-2xl font-semibold mb-2" style="color: #1E1E1E;">
+                                            ${searchTerm ? 'Nenhum paciente encontrado' : 'Nenhum paciente cadastrado'}
+                                        </h3>
+                                        <p class="text-gray-500 mb-6 text-lg">
+                                            ${searchTerm ? 'Tente outra busca' : 'Clique em "Novo Paciente" para começar'}
+                                        </p>
+                                    </div>
+                                ` : `
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        ${pacientesFiltrados.map(paciente => {
+                                            const progresso = this.calcularProgresso(paciente.progresso);
+                                            const ultimaAtualizacao = paciente.dataUltimaAtualizacao ? 
+                                                this.formatarDataHora(paciente.dataUltimaAtualizacao) : 'Nunca';
+                                            
+                                            return `
+                                                <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-all p-6 border-2 card fade-in"
+                                                    style="border-color: ${progresso > 0 ? '#064C4A' : '#E0E0E0'};">
+                                                    <div class="flex items-start justify-between mb-3">
+                                                        <div class="flex-1">
+                                                            <h3 class="font-bold text-xl mb-1" style="color: #1E1E1E;">${paciente.nome}</h3>
+                                                            <p class="text-sm text-gray-600">CPF: ${paciente.cpf}</p>
+                                                            <p class="text-xs text-gray-400 mt-1">
+                                                                📅 Última atualização: ${ultimaAtualizacao}
+                                                            </p>
+                                                        </div>
+                                                        <div class="px-3 py-1 rounded-full text-sm font-semibold text-white"
+                                                            style="background-color: ${progresso === 100 ? '#10B981' : progresso >= 50 ? '#F59E0B' : '#064C4A'};">
+                                                            ${progresso}%
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="space-y-2 mb-4 text-sm">
+                                                        <p style="color: #1E1E1E;"><strong>Plano:</strong> ${paciente.planoSaude || '-'}</p>
+                                                        <p style="color: #1E1E1E;"><strong>Medicamento:</strong> ${paciente.medicamento || '-'}</p>
+                                                        <p style="color: #1E1E1E;"><strong>CID-10:</strong> ${paciente.cid10 || '-'}</p>
+                                                    </div>
+
+                                                    <div class="mb-4">
+                                                        <div class="flex justify-between text-xs text-gray-600 mb-1">
+                                                            <span>Progresso Geral</span>
+                                                            <span>${progresso}%</span>
+                                                        </div>
+                                                        <div class="w-full rounded-full h-3 overflow-hidden" style="background-color: #E0E0E0;">
+                                                            <div class="h-full transition-all duration-500 rounded-full progress-gradient" 
+                                                                style="width: ${progresso}%;"></div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="grid grid-cols-3 gap-2">
+                                                        <button onclick='App.state.pacienteSelecionado = ${JSON.stringify(paciente).replace(/'/g, "\\'")}; App.state.view = "detalhe"; App.render();'
+                                                            class="px-3 py-2 btn-primary rounded-lg text-sm font-semibold">
+                                                            📊 Ver
+                                                        </button>
+                                                        <button onclick='App.state.pacienteEditando = ${JSON.stringify(paciente).replace(/'/g, "\\'")}; App.state.showEditModal = true; App.render();'
+                                                            class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">
+                                                            ✏️
+                                                        </button>
+                                                        <button onclick='App.state.pacienteSelecionado = ${JSON.stringify(paciente).replace(/'/g, "\\'")}; App.state.showShareModal = true; App.render();'
+                                                            class="px-3 py-2 btn-secondary rounded-lg text-sm font-semibold">
+                                                            📤
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    <button onclick='if(confirm("Tem certeza que deseja excluir ${paciente.nome}?")) App.excluirPaciente("${paciente.id}");'
+                                                        class="w-full mt-2 px-3 py-2 btn-danger rounded-lg text-sm font-semibold">
+                                                        🗑️ Excluir
+                                                    </button>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                `}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // VIEW: NOVO PACIENTE
+                else if (view === 'novo') {
+                    html += `
+                        <div class="min-h-screen p-4" style="background-color: #F5F5F5;">
+                            <div class="max-w-4xl mx-auto">
+                                <div class="bg-white rounded-lg shadow-xl p-8 fade-in">
+                                    <h2 class="text-3xl font-bold mb-6" style="color: #064C4A;">➕ Cadastro de Novo Paciente</h2>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                        ${[
+                                            { campo: 'nome', label: 'Nome Completo *', type: 'text', placeholder: 'Nome do paciente' },
+                                            { campo: 'cpf', label: 'CPF *', type: 'text', placeholder: '000.000.000-00' },
+                                            { campo: 'telefone', label: 'Telefone (WhatsApp)', type: 'text', placeholder: '(48) 99999-9999' },
+                                            { campo: 'email', label: 'E-mail', type: 'email', placeholder: 'email@exemplo.com' },
+                                            { campo: 'planoSaude', label: 'Plano de Saúde', type: 'text', placeholder: 'Ex: Unimed, Amil...' },
+                                            { campo: 'medicamento', label: 'Medicamento', type: 'text', placeholder: 'Nome do medicamento' },
+                                            { campo: 'diagnostico', label: 'Diagnóstico', type: 'text', placeholder: 'Ex: Câncer de mama' },
+                                            { campo: 'cid10', label: 'CID-10', type: 'text', placeholder: 'Ex: C50' }
+                                        ].map(f => `
+                                            <div>
+                                                <label class="block text-sm font-semibold mb-2" style="color: #1E1E1E;">${f.label}</label>
+                                                <input type="${f.type}" value="${novoPaciente[f.campo]}" 
+                                                    oninput="App.state.novoPaciente.${f.campo} = this.value"
+                                                    class="w-full px-4 py-3 border-2 rounded-lg focus:outline-none text-lg" 
+                                                    style="border-color: #E0E0E0;" 
+                                                    placeholder="${f.placeholder}" />
+                                            </div>
+                                        `).join('')}
+                                        <div class="md:col-span-2">
+                                            <label class="block text-sm font-semibold mb-2" style="color: #1E1E1E;">Data de Protocolo</label>
+                                            <input type="date" value="${novoPaciente.dataProtocolo}"
+                                                oninput="App.state.novoPaciente.dataProtocolo = this.value"
+                                                class="w-full px-4 py-3 border-2 rounded-lg focus:outline-none text-lg"
+                                                style="border-color: #E0E0E0;" />
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-4">
+                                        <button onclick="App.state.view = 'lista'; App.render();"
+                                            class="flex-1 px-6 py-4 border-2 rounded-lg hover:bg-gray-50 font-semibold text-lg"
+                                            style="border-color: #E0E0E0; color: #1E1E1E;">
+                                            ← Cancelar
+                                        </button>
+                                        <button onclick="App.adicionarPaciente();"
+                                            class="flex-1 px-6 py-4 btn-secondary rounded-lg font-semibold shadow-md text-lg">
+                                            💾 Salvar Paciente
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // VIEW: DETALHE
+                else if (view === 'detalhe' && pacienteSelecionado) {
+                    const progressoGeral = this.calcularProgresso(pacienteSelecionado.progresso);
+                    const ultimaAtualizacao = pacienteSelecionado.dataUltimaAtualizacao ? 
+                        this.formatarDataHora(pacienteSelecionado.dataUltimaAtualizacao) : 'Nunca';
+                    
+                    html += `
+                        <div class="min-h-screen p-4" style="background-color: #F5F5F5;">
+                            <div class="max-w-6xl mx-auto">
+                                <div class="bg-white rounded-lg shadow-xl p-6 mb-6 fade-in">
+                                    <div class="flex items-center justify-between mb-4 flex-wrap gap-4">
+                                        <button onclick="App.state.pacienteSelecionado = null; App.state.view = 'lista'; App.render();"
+                                            class="hover:opacity-80 flex items-center gap-2 font-semibold text-lg" style="color: #064C4A;">
+                                            ← Voltar
+                                        </button>
+                                        <div class="flex gap-2">
+                                            <button onclick='App.state.pacienteEditando = ${JSON.stringify(pacienteSelecionado).replace(/'/g, "\\'")}; App.state.showEditModal = true; App.render();'
+                                                class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold">
+                                                ✏️ Editar
+                                            </button>
+                                            <button onclick="App.state.showShareModal = true; App.render();"
+                                                class="flex items-center gap-2 btn-secondary px-4 py-2 rounded-lg font-semibold">
+                                                📤 Compartilhar
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex flex-col md:flex-row items-start justify-between mb-6 gap-4">
+                                        <div class="flex-1">
+                                            <h1 class="text-3xl md:text-4xl font-bold mb-3" style="color: #064C4A;">${pacienteSelecionado.nome}</h1>
+                                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+                                                <div>
+                                                    <p class="text-gray-600">CPF</p>
+                                                    <p class="font-semibold">${pacienteSelecionado.cpf}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-gray-600">Telefone</p>
+                                                    <p class="font-semibold">${pacienteSelecionado.telefone || '-'}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-gray-600">Plano</p>
+                                                    <p class="font-semibold">${pacienteSelecionado.planoSaude || '-'}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-gray-600">Medicamento</p>
+                                                    <p class="font-semibold">${pacienteSelecionado.medicamento || '-'}</p>
+                                                </div>
+                                            </div>
+                                            <p class="text-xs text-gray-500">
+                                                📅 Última atualização: ${ultimaAtualizacao}
+                                            </p>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="inline-block px-8 py-4 rounded-lg text-3xl font-bold text-white shadow-lg"
+                                                style="background-color: ${progressoGeral === 100 ? '#10B981' : progressoGeral >= 50 ? '#F59E0B' : '#064C4A'};">
+                                                ${progressoGeral}%
+                                            </div>
+                                            <p class="text-sm text-gray-600 mt-2 font-semibold">Progresso Geral</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-2">
+                                        <div class="flex justify-between text-sm text-gray-600 mb-2">
+                                            <span class="font-semibold">Andamento do Processo</span>
+                                            <span>${progressoGeral}% concluído</span>
+                                        </div>
+                                        <div class="w-full rounded-full h-8 overflow-hidden shadow-inner" style="background-color: #E0E0E0;">
+                                            <div class="h-full transition-all duration-500 flex items-center justify-end pr-3 progress-gradient"
+                                                style="width: ${progressoGeral}%;">
+                                                ${progressoGeral > 5 ? `<span class="text-white text-sm font-bold">${progressoGeral}%</span>` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                ${this.fases.map(fase => {
+                                    const progressoFase = this.calcularProgressoFase(fase.id, pacienteSelecionado.progresso);
+                                    return `
+                                        <div class="bg-white rounded-lg shadow-md p-6 mb-4 fade-in">
+                                            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                                                <h3 class="text-xl md:text-2xl font-bold" style="color: #1E1E1E;">
+                                                    Fase ${fase.id}: ${fase.nome}
+                                                </h3>
+                                                <span class="px-4 py-2 rounded-full text-sm font-semibold text-white"
+                                                    style="background-color: ${progressoFase === 100 ? '#10B981' : progressoFase > 0 ? '#F59E0B' : '#E0E0E0'};">
+                                                    ${progressoFase}%
+                                                </span>
+                                            </div>
+
+                                            <div class="mb-4">
+                                                <div class="w-full rounded-full h-3 overflow-hidden" style="background-color: #E0E0E0;">
+                                                    <div class="h-full transition-all duration-300" 
+                                                        style="width: ${progressoFase}%; background-color: #064C4A;"></div>
+                                                </div>
+                                            </div>
+
+                                            <div class="space-y-3">
+                                                ${fase.etapas.map((etapa, idx) => {
+                                                    const key = `${fase.id}-${idx}`;
+                                                    const checked = pacienteSelecionado.progresso?.[key] || false;
+                                                    const timestamp = pacienteSelecionado.timestamps?.[key] || null;
+                                                    const observacoes = pacienteSelecionado.observacoes?.[key] || [];
+                                                    
+                                                    return `
+                                                        <div class="border-2 rounded-lg p-4 transition-all"
+                                                            style="background-color: ${checked ? '#F0FDF4' : '#F9FAFB'}; border-color: ${checked ? '#10B981' : '#E0E0E0'};">
+                                                            <div class="flex items-start gap-3 mb-2">
+                                                                <input type="checkbox" ${checked ? 'checked' : ''} 
+                                                                    class="w-6 h-6 cursor-pointer mt-1" 
+                                                                    onclick="App.toggleEtapa(${fase.id}, ${idx});" />
+                                                                <div class="flex-1">
+                                                                    <span class="text-base font-semibold" 
+                                                                        style="color: ${checked ? '#1E1E1E' : '#6B7280'};">
+                                                                        ${etapa}
+                                                                    </span>
+                                                                    ${checked && timestamp ? `
+                                                                        <p class="timestamp mt-1">
+                                                                            ✅ Concluído em: ${this.formatarDataHora(timestamp)}
+                                                                        </p>
+                                                                    ` : ''}
+                                                                </div>
+                                                                ${checked ? '<span style="color: #10B981; font-size: 24px;">✓</span>' : ''}
+                                                            </div>
+                                                            
+                                                            ${checked ? `
+                                                                <button onclick='App.state.etapaObservacao = {faseId: ${fase.id}, etapaIdx: ${idx}}; App.state.showObservacaoModal = true; App.render();'
+                                                                    class="mt-2 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-semibold">
+                                                                    📝 Adicionar Observação
+                                                                </button>
+                                                            ` : ''}
+                                                            
+                                                            ${observacoes.length > 0 ? `
+                                                                <div class="mt-3 space-y-2">
+                                                                    ${observacoes.map(obs => `
+                                                                        <div class="bg-white p-3 rounded border border-blue-200">
+                                                                            <p class="text-sm text-gray-700">${obs.texto}</p>
+                                                                            <p class="text-xs text-gray-500 mt-1">
+                                                                                📅 ${this.formatarDataHora(obs.data)}
+                                                                            </p>
+                                                                        </div>
+                                                                    `).join('')}
+                                                                </div>
+                                                            ` : ''}
+                                                        </div>
+                                                    `;
+                                                }).join('')}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('app').innerHTML = html;
+            }
+        };
+
+        // Verificar se é visualização pública
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('view') === 'publico' && urlParams.get('id')) {
+            const idPublico = urlParams.get('id');
+            
+            try {
+                const dados = localStorage.getItem('pacientes_marcell_bastos');
+                if (dados) {
+                    const pacientes = JSON.parse(dados);
+                    const paciente = pacientes.find(p => p.linkPublico === idPublico);
+                    
+                    if (paciente) {
+                        const progressoGeral = App.calcularProgresso(paciente.progresso);
+                        const ultimaAtualizacao = paciente.dataUltimaAtualizacao ? 
+                            App.formatarDataHora(paciente.dataUltimaAtualizacao) : 'Nunca';
+                        
+                        document.getElementById('app').innerHTML = `
+                            <div class="min-h-screen p-4" style="background-color: #F5F5F5;">
+                                <div class="max-w-4xl mx-auto">
+                                    <div class="bg-white rounded-lg shadow-xl p-6 mb-6 fade-in">
+                                        <div class="text-center mb-6">
+                                            <svg width="70" height="70" viewBox="0 0 100 100" class="mx-auto mb-4">
+                                                <circle cx="50" cy="50" r="45" fill="none" stroke="#064C4A" stroke-width="3"/>
+                                                <path d="M30 60 Q40 45, 50 55 Q60 65, 70 50" fill="none" stroke="#064C4A" stroke-width="3"/>
+                                                <rect x="45" y="15" width="10" height="35" fill="#064C4A"/>
+                                                <rect x="40" y="20" width="20" height="5" fill="#064C4A"/>
+                                                <rect x="40" y="28" width="20" height="3" fill="#064C4A"/>
+                                            </svg>
+                                            <h1 class="text-3xl font-bold mb-2" style="color: #064C4A;">Marcell Bastos</h1>
+                                            <p class="text-gray-600">Saúde Suplementar - Acompanhamento de Processo</p>
+                                            <p class="text-xs text-gray-500 mt-2">Última atualização: ${ultimaAtualizacao}</p>
+                                        </div>
+
+                                        <div class="border-t-2 pt-6" style="border-color: #E0E0E0;">
+                                            <h2 class="text-2xl font-bold mb-2" style="color: #1E1E1E;">${paciente.nome}</h2>
+                                            <div class="grid grid-cols-2 gap-4 text-sm mb-6">
+                                                <div>
+                                                    <p class="text-gray-600">Plano de Saúde</p>
+                                                    <p class="font-semibold">${paciente.planoSaude || '-'}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-gray-600">Medicamento</p>
+                                                    <p class="font-semibold">${paciente.medicamento || '-'}</p>
+                                                </div>
+                                            </div>
+
+                                            <div class="bg-gradient-to-r from-blue-50 to-green-50 p-6 rounded-lg mb-6">
+                                                <div class="text-center mb-4">
+                                                    <div class="inline-block px-10 py-5 rounded-lg text-4xl font-bold text-white shadow-lg"
+                                                        style="background-color: ${progressoGeral === 100 ? '#10B981' : progressoGeral >= 50 ? '#F59E0B' : '#064C4A'};">
+                                                        ${progressoGeral}%
+                                                    </div>
+                                                    <p class="text-sm text-gray-700 mt-3 font-semibold">Progresso do Processo</p>
+                                                </div>
+                                                
+                                                <div class="w-full rounded-full h-8 overflow-hidden shadow-inner" style="background-color: #E0E0E0;">
+                                                    <div class="h-full transition-all duration-500 flex items-center justify-center progress-gradient"
+                                                        style="width: ${progressoGeral}%;">
+                                                        ${progressoGeral > 10 ? `<span class="text-white text-sm font-bold">${progressoGeral}% Concluído</span>` : ''}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    ${App.fases.map(fase => {
+                                        const progressoFase = App.calcularProgressoFase(fase.id, paciente.progresso);
+                                        return `
+                                            <div class="bg-white rounded-lg shadow-md p-5 mb-4 fade-in">
+                                                <div class="flex items-center justify-between mb-3">
+                                                    <h3 class="text-lg md:text-xl font-bold" style="color: #1E1E1E;">
+                                                        ${fase.nome}
+                                                    </h3>
+                                                    <span class="px-3 py-1 rounded-full text-xs font-semibold text-white"
+                                                        style="background-color: ${progressoFase === 100 ? '#10B981' : progressoFase > 0 ? '#F59E0B' : '#E0E0E0'};">
+                                                        ${progressoFase}%
+                                                    </span>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <div class="w-full rounded-full h-2 overflow-hidden" style="background-color: #E0E0E0;">
+                                                        <div class="h-full transition-all duration-300" 
+                                                            style="width: ${progressoFase}%; background-color: #064C4A;"></div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="space-y-2">
+                                                    ${fase.etapas.map((etapa, idx) => {
+                                                        const key = `${fase.id}-${idx}`;
+                                                        const checked = paciente.progresso?.[key] || false;
+                                                        const timestamp = paciente.timestamps?.[key] || null;
+                                                        
+                                                        return `
+                                                            <div class="flex items-start gap-3 p-3 rounded-lg"
+                                                                style="background-color: ${checked ? '#F0FDF4' : '#F9FAFB'};">
+                                                                <span style="color: ${checked ? '#10B981' : '#E0E0E0'}; font-size: 24px;">
+                                                                    ${checked ? '✓' : '○'}
+                                                                </span>
+                                                                <div class="flex-1">
+                                                                    <span class="text-sm font-semibold" 
+                                                                        style="color: ${checked ? '#1E1E1E' : '#6B7280'};">
+                                                                        ${etapa}
+                                                                    </span>
+                                                                    ${checked && timestamp ? `
+                                                                        <p class="timestamp mt-1">
+                                                                            ✅ ${App.formatarDataHora(timestamp)}
+                                                                        </p>
+                                                                    ` : ''}
+                                                                </div>
+                                                            </div>
+                                                        `;
+                                                    }).join('')}
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+
+                                    <div class="bg-white rounded-lg shadow-md p-6 text-center fade-in">
+                                        <p class="text-sm text-gray-600 mb-2">
+                                            💬 Dúvidas? Entre em contato pelo WhatsApp
+                                        </p>
+                                        <p class="text-xs text-gray-500">
+                                            Este acompanhamento é atualizado em tempo real pelo seu advogado.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('app').innerHTML = `
+                            <div class="min-h-screen flex items-center justify-center p-4" style="background-color: #F5F5F5;">
+                                <div class="bg-white rounded-lg shadow-xl p-8 max-w-md text-center">
+                                    <div class="text-6xl mb-4">⚠️</div>
+                                    <h2 class="text-2xl font-bold mb-2" style="color: #F71735;">Processo não encontrado</h2>
+                                    <p class="text-gray-600">
+                                        O link que você acessou não está mais disponível ou foi removido.
+                                        Entre em contato com seu advogado para obter um novo link.
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao carregar visualização pública:', error);
+            }
+        } else {
+            // Inicializar sistema normal
+            window.addEventListener('DOMContentLoaded', () => {
+                App.init();
+            });
+        }
+    </script>
+</body>
+</html>
