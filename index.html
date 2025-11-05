@@ -382,9 +382,10 @@
                 return `${dia}/${mes}/${ano} às ${hora}:${min}`;
             },
 
-            gerarLinkCompartilhamento(paciente) {
-                return `${window.location.origin}${window.location.pathname}?view=publico&id=${paciente.linkPublico}`;
-            },
+          gerarLinkCompartilhamento(paciente) {
+    const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+    return `${baseUrl}publico.html?id=${paciente.linkPublico}`;
+},
 
             copiarLink(paciente) {
                 const link = this.gerarLinkCompartilhamento(paciente);
