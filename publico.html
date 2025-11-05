@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acompanhamento de Processo - Marcell Bastos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #F5F5F5;
+        }
+        .progress-gradient {
+            background: linear-gradient(to right, #064C4A, #F71735);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="min-h-screen p-3 md:p-4"></div>
+
+    <script>
+        // Buscar ID da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const idPublico = urlParams.get('id');
+        
+        if (!idPublico) {
+            document.getElementById('app').innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-4">
+                    <div class="bg-white rounded-lg shadow-xl p-6 md:p-8 max-w-md text-center">
+                        <div class="text-5xl md:text-6xl mb-4">⚠️</div>
+                        <h2 class="text-xl md:text-2xl font-bold mb-2 text-red-600">Link inválido</h2>
+                        <p class="text-sm md:text-base text-gray-600">
+                            Este link não contém um ID válido. Entre em contato com seu advogado.
+                        </p>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Carregar dados do localStorage
+            try {
+                const dados = localStorage.getItem('pacientes_marcell_bastos');
+                if (dados) {
+                    const pacientes = JSON.parse(dados);
+                    const paciente = pacientes.find(p => p.linkPublico === idPublico);
+                    
+                    if (paciente) {
+                        mostrarPaciente(paciente);
+                    } else {
+                        mostrarErro();
+                    }
+                } else {
+                    mostrarErro();
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarErro();
+            }
+        }
+        
+        function mostrarErro() {
+            document.getElementById('app').innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-4">
+                    <div class="bg-white rounded-lg shadow-xl p-6 md:p-8 max-w-md text-center">
+                        <div class="text-5xl md:text-6xl mb-4">⚠️</div>
+                        <h2 class="text-xl md:text-2xl font-bold mb-2" style="color: #F71735;">Processo não encontrado</h2>
+                        <p class="text-sm md:text-base text-gray-600">
+                            O link que você acessou não está mais disponível ou foi removido.
+                            Entre em contato com seu advogado para obter um novo link.
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function mostrarPaciente(paciente) {
+            const fases = [
+                {
+                    id: 1, nome: 'Captação e Primeiro Contato', peso: 10,
+                    etapas: ['Primeiro contato WhatsApp', 'Triagem inicial', 'Solicitação de documentos']
+                },
+                {
+                    id: 2, nome: 'Consulta e Contratação', peso: 15,
+                    etapas: ['Agendamento', 'Consulta inicial', 'Assinatura contrato']
+                },
+                {
+                    id: 3, nome: 'Petição e Protocolo', peso: 15,
+                    etapas: ['Elaboração petição', 'Reunir documentos', 'Protocolo EPROC']
+                },
+                {
+                    id: 4, nome: 'Acompanhamento', peso: 20,
+                    etapas: ['Distribuição', 'Análise pelo juiz']
+                },
+                {
+                    id: 5, nome: 'Decisão Liminar', peso: 20,
+                    etapas: ['Liminar deferida', 'Notificação plano', 'Cumprimento']
+                },
+                {
+                    id: 6, nome: 'Contestação', peso: 10,
+                    etapas: ['Prazo contestação', 'Especificação provas', 'Audiência']
+                },
+                {
+                    id: 7, nome: 'Sentença', peso: 10,
+                    etapas: ['Sentença primeiro grau']
+                }
+            ];
+            
+            function calcularProgresso(progresso) {
+                if (!progresso) return 0;
+                let total = 0;
+                let completado = 0;
+                fases.forEach(fase => {
+                    fase.etapas.forEach((_, idx) => {
+                        total += fase.peso / fase.etapas.length;
+                        if (progresso[\`\${fase.id}-\${idx}\`]) {
+                            completado += fase.peso / fase.etapas.length;
+                        }
+                    });
+                });
+                return Math.round(completado);
+            }
+            
+            function calcularProgressoFase(faseId, progresso) {
+                if (!progresso) return 0;
+                const fase = fases.find(f => f.id === faseId);
+                if (!fase) return 0;
+                let completadas = 0;
+                fase.etapas.forEach((_, idx) => {
+                    if (progresso[\`\${faseId}-\${idx}\`]) completadas++;
+                });
+                return Math.round((completadas / fase.etapas.length) * 100);
+            }
+            
+            function formatarDataHora(isoString) {
+                if (!isoString) return '';
+                const data = new Date(isoString);
+                const dia = String(data.getDate()).padStart(2, '0');
+                const mes = String(data.getMonth() + 1).padStart(2, '0');
+                const ano = data.getFullYear();
+                const hora = String(data.getHours()).padStart(2, '0');
+                const min = String(data.getMinutes()).padStart(2, '0');
+                return \`\${dia}/\${mes}/\${ano} às \${hora}:\${min}\`;
+            }
+            
+            const progressoGeral = calcularProgresso(paciente.progresso);
+            const ultimaAtualizacao = formatarDataHora(paciente.dataUltimaAtualizacao);
+            
+            let html = \`
+                <div class="max-w-4xl mx-auto">
+                    <div class="bg-white rounded-lg shadow-xl p-4 md:p-6 mb-4 md:mb-6 fade-in">
+                        <div class="text-center mb-4 md:mb-6">
+                            <svg width="60" height="60" viewBox="0 0 100 100" class="mx-auto mb-3 md:mb-4">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#064C4A" stroke-width="3"/>
+                                <path d="M30 60 Q40 45, 50 55 Q60 65, 70 50" fill="none" stroke="#064C4A" stroke-width="3"/>
+                                <rect x="45" y="15" width="10" height="35" fill="#064C4A"/>
+                                <rect x="40" y="20" width="20" height="5" fill="#064C4A"/>
+                                <rect x="40" y="28" width="20" height="3" fill="#064C4A"/>
+                            </svg>
+                            <h1 class="text-2xl md:text-3xl font-bold mb-2" style="color: #064C4A;">Marcell Bastos</h1>
+                            <p class="text-sm md:text-base text-gray-600">Saúde Suplementar - Acompanhamento de Processo</p>
+                            <p class="text-xs text-gray-500 mt-2">Última atualização: \${ultimaAtualizacao || 'Nunca'}</p>
+                        </div>
+
+                        <div class="border-t-2 pt-4 md:pt-6" style="border-color: #E0E0E0;">
+                            <h2 class="text-xl md:text-2xl font-bold mb-2" style="color: #1E1E1E;">\${paciente.nome}</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-sm mb-4 md:mb-6">
+                                <div>
+                                    <p class="text-gray-600">Plano de Saúde</p>
+                                    <p class="font-semibold">\${paciente.planoSaude || '-'}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600">Medicamento</p>
+                                    <p class="font-semibold">\${paciente.medicamento || '-'}</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-gradient-to-r from-blue-50 to-green-50 p-4 md:p-6 rounded-lg mb-4 md:mb-6">
+                                <div class="text-center mb-4">
+                                    <div class="inline-block px-8 md:px-10 py-4 md:py-5 rounded-lg text-3xl md:text-4xl font-bold text-white shadow-lg"
+                                        style="background-color: \${progressoGeral === 100 ? '#10B981' : progressoGeral >= 50 ? '#F59E0B' : '#064C4A'};">
+                                        \${progressoGeral}%
+                                    </div>
+                                    <p class="text-xs md:text-sm text-gray-700 mt-3 font-semibold">Progresso do Processo</p>
+                                </div>
+                                
+                                <div class="w-full rounded-full h-6 md:h-8 overflow-hidden shadow-inner" style="background-color: #E0E0E0;">
+                                    <div class="h-full transition-all duration-500 flex items-center justify-center progress-gradient"
+                                        style="width: \${progressoGeral}%;">
+                                        \${progressoGeral > 10 ? \`<span class="text-white text-xs md:text-sm font-bold">\${progressoGeral}% Concluído</span>\` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+            \`;
+            
+            fases.forEach(fase => {
+                const progressoFase = calcularProgressoFase(fase.id, paciente.progresso);
+                html += \`
+                    <div class="bg-white rounded-lg shadow-md p-4 md:p-5 mb-3 md:mb-4 fade-in">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-base md:text-lg font-bold" style="color: #1E1E1E;">
+                                \${fase.nome}
+                            </h3>
+                            <span class="px-2 md:px-3 py-1 rounded-full text-xs font-semibold text-white"
+                                style="background-color: \${progressoFase === 100 ? '#10B981' : progressoFase > 0 ? '#F59E0B' : '#E0E0E0'};">
+                                \${progressoFase}%
+                            </span>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="w-full rounded-full h-2 overflow-hidden" style="background-color: #E0E0E0;">
+                                <div class="h-full transition-all duration-300" 
+                                    style="width: \${progressoFase}%; background-color: #064C4A;"></div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                \`;
+                
+                fase.etapas.forEach((etapa, idx) => {
+                    const key = \`\${fase.id}-\${idx}\`;
+                    const checked = paciente.progresso?.[key] || false;
+                    const timestamp = paciente.timestamps?.[key] || null;
+                    
+                    html += \`
+                        <div class="flex items-start gap-2 md:gap-3 p-2 md:p-3 rounded-lg"
+                            style="background-color: \${checked ? '#F0FDF4' : '#F9FAFB'};">
+                            <span style="color: \${checked ? '#10B981' : '#E0E0E0'}; font-size: 20px md:24px;">
+                                \${checked ? '✓' : '○'}
+                            </span>
+                            <div class="flex-1">
+                                <span class="text-xs md:text-sm font-semibold block" 
+                                    style="color: \${checked ? '#1E1E1E' : '#6B7280'};">
+                                    \${etapa}
+                                </span>
+                                \${checked && timestamp ? \`
+                                    <p class="text-xs text-gray-500 italic mt-1">
+                                        ✅ \${formatarDataHora(timestamp)}
+                                    </p>
+                                \` : ''}
+                            </div>
+                        </div>
+                    \`;
+                });
+                
+                html += \`
+                        </div>
+                    </div>
+                \`;
+            });
+            
+            html += \`
+                    <div class="bg-white rounded-lg shadow-md p-4 md:p-6 text-center fade-in">
+                        <p class="text-sm md:text-base text-gray-600 mb-2">
+                            💬 Dúvidas? Entre em contato pelo WhatsApp
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            Este acompanhamento é atualizado em tempo real pelo seu advogado.
+                        </p>
+                    </div>
+
+                    <div class="text-center mt-4 md:mt-6 text-xs text-gray-400">
+                        <p>Powered by Marcell Bastos - Saúde Suplementar</p>
+                    </div>
+                </div>
+            \`;
+            
+            document.getElementById('app').innerHTML = html;
+        }
+    </script>
+</body>
+</html>
